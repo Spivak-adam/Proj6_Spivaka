@@ -1,0 +1,3 @@
+C:\CS271\Project0\Debug\Project.exe
+C:\CS271\SetupCheck\Debug\Project.exe
+C:\CS271\Template\Debug\Project.exe
