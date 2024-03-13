@@ -1,16 +1,18 @@
-Microsoft (R) Macro Assembler Version 14.29.30153.0	    01/24/24 15:00:15
-#Program Template     (template.asm			     Page 1 - 1
+Microsoft (R) Macro Assembler Version 14.29.30153.0	    03/12/24 21:41:23
+/Low level I/O Procedures    (Proj6_Spivaka.asm		     Page 1 - 1
 
 
-				TITLE Program Template     (template.asm)
-
+				TITLE Low level I/O Procedures    (Proj6_Spivaka.asm)
 				; Author: Adam Spivak
-				; Last Modified:
-				; OSU email address: ONID_ID@oregonstate.edu
+				; Last Modified: 3-17-24
+				; OSU email address: Spivaka@oregonstate.edu
 				; Course number/section: CS271 Section 271
-				; Project Number:                 Due Date:
-				; Description: This file is provided as a template from which you may work
-				;              when developing assembly projects in CS271.
+				; Project Number: 6           Due Date: 3-17-24
+				; Description: A program that demonstrates the understanding of Lower level programming. The program asks a user to enter 10 integers that
+				; can fit into a 32 bit register. It then prints out the 10 numbers, the sum of those numbers, and the truncated average. When the numbers are
+				; entered they are taken in as a string and translated from their ASCII strings into regular numbers by subtracting from their respective ASCII positions.
+				; It will chech for sign idications such as (e.g. "+", "-") and a decimal points for FPUs. It will also validate that the values entered are not letters
+				; by checking for nubmers within a specific range.
 
 				INCLUDE Irvine32.inc
 			      C ; Include file for Irvine32.lib             (Irvine32.inc)
@@ -31,31 +33,162 @@ Microsoft (R) Macro Assembler Version 14.29.30153.0	    01/24/24 15:00:15
 			      C .LIST
 			      C 
 
-				; (insert macro definitions here)
-
 				; (insert constant definitions here)
 
- 00000000			.data
+				;-----------------------------------------------------------------------------------------------------------
+				; Name: mGetstring
+				; Description: A macro that recieves three parameters and gets numbers from user, then sends that number back to Called PRROC
+				; Preconditions: Called from ReadVal procedure
+				; Postcondition: Sends numbers back to a called procedure
+				; Recieves:
+				;		promptUser	- message to prompt user to enter numbers
+				;		storeNum	- parameter by reference to store value
+				;		byteLength	- the length a number can be to fit into a 32 bit register
+				; Return:
+				;-----------------------------------------------------------------------------------------------------------
+				mGetstring MACRO promptUser, storeNum, byteLength
+					PUSH EDX
+					PUSH EAX
+					PUSH ECX
 
-				; (insert variable definitions here)
+				_enter_Num:
+					MOVE EDX, promptUser
+					print_Text
+
+					CALL ReadString
+					MOVE ECX, 4
+					MOVE storeNum, EDX
+					
+					CMP EAX, byteLength
+					JE _valid_num_size
+					JA _enter_Num
+
+				_valid_num_size:
+
+				ENDM
+
+				;-----------------------------------------------------------------------------------------------------------
+				; Name: mDisplayString
+				; Description:
+				; Preconditions:
+				; Postcondition:
+				; Recieves:
+				; Return:
+				;-----------------------------------------------------------------------------------------------------------
+				mDisplayString MACRO
+
+				ENDM
+
+ 00000000			.data
+ 00000000 50 72 6F 67 72	intro_display			BYTE	"Programming assignment 6: Designing low-level I/O procedures",10,
+	   61 6D 6D 69 6E
+	   67 20 61 73 73
+	   69 67 6E 6D 65
+	   6E 74 20 36 3A
+	   20 44 65 73 69
+	   67 6E 69 6E 67
+	   20 6C 6F 77 2D
+	   6C 65 76 65 6C
+	   20 49 2F 4F 20
+	   70 72 6F 63 65
+	   64 75 72 65 73
+	   0A 57 72 69 74
+	   74 65 6E 20 62
+	   79 3A 20 41 64
+	   61 6D 20 53 70
+	   69 76 61 6B 00
+												"Written by: Adam Spivak",0
+
+ = CALL WriteString		print_Text				EQU		<CALL WriteString>
+ = CALL CrLf			new_Line				EQU		<CALL CrLf>
+ = MOV				MOVE					TEXTEQU <MOV>					; Turns MOV into MOVE to help with text alignment with PUSH
 
  00000000			.code
+				;-----------------------------------------------------------------------------------------------------------
+				; Name: main
+				; Description:
+				; Preconditions:
+				; Postcondition:
+				; Recieves:
+				; Return:
+				;-----------------------------------------------------------------------------------------------------------
  00000000			main PROC
 
-				; (insert executable instructions here)
+ 00000000  E8 00000007			CALL ReadVal
 
 					Invoke ExitProcess,0	; exit to operating system
- 00000000  6A 00	   *	    push   +000000000h
- 00000002  E8 00000000 E   *	    call   ExitProcess
- 00000007			main ENDP
+ 00000005  6A 00	   *	    push   +000000000h
+ 00000007  E8 00000000 E   *	    call   ExitProcess
+ 0000000C			main ENDP
 
-				; (insert additional procedures here)
+				;-----------------------------------------------------------------------------------------------------------
+				; Name:
+				; Description:
+				; Preconditions:
+				; Postcondition:
+				; Recieves:
+				; Return:
+				;-----------------------------------------------------------------------------------------------------------
+ 0000000C			ReadVal PROC
+ 0000000C  55			PUSH EBP
+ 0000000D  8B EC		MOVE EBP, ESP
+
+					CALL mGetString
+Proj6_Spivaka.asm(97) : error A2148:invalid symbol type in expression : mGetstring
+
+ 0000000F  5D			POP EBP
+ 00000010  C3			RET
+ 00000011			ReadVal ENDP
+
+				;-----------------------------------------------------------------------------------------------------------
+				; Name:
+				; Description:
+				; Preconditions:
+				; Postcondition:
+				; Recieves:
+				; Return:
+				;-----------------------------------------------------------------------------------------------------------
+ 00000011			ReadFloatVal PROC
+ 00000011  55			PUSH EBP
+ 00000012  8B EC		MOVE EBP, ESP
+
+
+
+ 00000014  5D			POP EBP
+ 00000015  C3			RET
+ 00000016			ReadFloatVal ENDP
+
+				;-----------------------------------------------------------------------------------------------------------
+				; Name:
+				; Description:
+				; Preconditions:
+				; Postcondition:
+				; Recieves:
+				; Return:
+				;-----------------------------------------------------------------------------------------------------------
+ 00000016			WriteFloatVal PROC
+ 00000016  55			PUSH EBP
+ 00000017  8B EC		MOVE EBP, ESP
+
+
+
+ 00000019  5D			POP EBP
+ 0000001A  C3			RET
+ 0000001B			WriteFloatVal ENDP
 
 				END main
-Microsoft (R) Macro Assembler Version 14.29.30153.0	    01/24/24 15:00:15
-#Program Template     (template.asm			     Symbols 2 - 1
+Microsoft (R) Macro Assembler Version 14.29.30153.0	    03/12/24 21:41:23
+/Low level I/O Procedures    (Proj6_Spivaka.asm		     Symbols 2 - 1
 
 
+
+
+Macros:
+
+                N a m e                 Type
+
+mDisplayString . . . . . . . . .	Proc
+mGetstring . . . . . . . . . . .	Proc
 
 
 Structures and Unions:
@@ -146,8 +279,8 @@ Segments and Groups:
 
 FLAT . . . . . . . . . . . . . .	GROUP
 STACK  . . . . . . . . . . . . .	32 Bit	 00001000 Para	  Stack	  'STACK'	 
-_DATA  . . . . . . . . . . . . .	32 Bit	 00000000 Para	  Public  'DATA'	
-_TEXT  . . . . . . . . . . . . .	32 Bit	 00000007 Para	  Public  'CODE'	
+_DATA  . . . . . . . . . . . . .	32 Bit	 00000055 Para	  Public  'DATA'	
+_TEXT  . . . . . . . . . . . . .	32 Bit	 00000026 Para	  Public  'CODE'	
 
 
 Procedures, parameters, and locals:
@@ -210,6 +343,7 @@ ReadConsoleA . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 ReadConsoleInputA  . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadDec  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadFile . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
+ReadFloatVal . . . . . . . . . .	P Near	 0000001C _TEXT	Length= 00000005 Public STDCALL
 ReadFloat  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadFromFile . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadHex  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
@@ -217,6 +351,7 @@ ReadInt  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 ReadKeyFlush . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadKey  . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 ReadString . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
+ReadVal  . . . . . . . . . . . .	P Near	 0000000C _TEXT	Length= 00000010 Public STDCALL
 SetConsoleCursorInfo . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 SetConsoleCursorPosition . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 SetConsoleMode . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
@@ -245,6 +380,7 @@ WriteConsoleOutputAttribute  . .	P Near	 00000000 FLAT	Length= 00000000 External
 WriteConsoleOutputCharacterA . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteDec . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteFile  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
+WriteFloatVal  . . . . . . . . .	P Near	 00000021 _TEXT	Length= 00000005 Public STDCALL
 WriteFloat . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteHexB  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteHex . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
@@ -254,7 +390,7 @@ WriteStackFrame  . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External
 WriteString  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteToFile  . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
 WriteWindowsMsg  . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External STDCALL
-main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 00000007 Public STDCALL
+main . . . . . . . . . . . . . .	P Near	 00000000 _TEXT	Length= 0000000C Public STDCALL
 printf . . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C
 scanf  . . . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C
 wsprintfA  . . . . . . . . . . .	P Near	 00000000 FLAT	Length= 00000000 External C
@@ -372,6 +508,7 @@ MB_YESNOCANCEL . . . . . . . . .	Number	 00000003h
 MB_YESNO . . . . . . . . . . . .	Number	 00000004h   
 MENU_EVENT . . . . . . . . . . .	Number	 00000008h   
 MOUSE_EVENT  . . . . . . . . . .	Number	 00000002h   
+MOVE . . . . . . . . . . . . . .	Text   	 MOV
 MessageBox . . . . . . . . . . .	Text   	 MessageBoxA
 NULL . . . . . . . . . . . . . .	Number	 00000000h   
 NUMLOCK_ON . . . . . . . . . . .	Number	 00000020h   
@@ -480,6 +617,7 @@ cyan . . . . . . . . . . . . . .	Number	 00000003h
 exit . . . . . . . . . . . . . .	Text   	 INVOKE ExitProcess,0
 gray . . . . . . . . . . . . . .	Number	 00000008h   
 green  . . . . . . . . . . . . .	Number	 00000002h   
+intro_display  . . . . . . . . .	Byte	 00000000 _DATA	
 lightBlue  . . . . . . . . . . .	Number	 00000009h   
 lightCyan  . . . . . . . . . . .	Number	 0000000Bh   
 lightGray  . . . . . . . . . . .	Number	 00000007h   
@@ -487,10 +625,12 @@ lightGreen . . . . . . . . . . .	Number	 0000000Ah
 lightMagenta . . . . . . . . . .	Number	 0000000Dh   
 lightRed . . . . . . . . . . . .	Number	 0000000Ch   
 magenta  . . . . . . . . . . . .	Number	 00000005h   
+new_Line . . . . . . . . . . . .	Text   	 CALL CrLf
+print_Text . . . . . . . . . . .	Text   	 CALL WriteString
 red  . . . . . . . . . . . . . .	Number	 00000004h   
 white  . . . . . . . . . . . . .	Number	 0000000Fh   
 wsprintf . . . . . . . . . . . .	Text   	 wsprintfA
 yellow . . . . . . . . . . . . .	Number	 0000000Eh   
 
 	   0 Warnings
-	   0 Errors
+	   1 Errors
