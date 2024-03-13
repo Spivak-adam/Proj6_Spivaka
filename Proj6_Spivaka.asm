@@ -71,6 +71,7 @@ MOVE					TEXTEQU <MOV>					; Turns MOV into MOVE to help with text alignment wit
 ;-----------------------------------------------------------------------------------------------------------
 ; Name: main
 ; Description:
+
 ; Preconditions:
 ; Postcondition:
 ; Recieves:
