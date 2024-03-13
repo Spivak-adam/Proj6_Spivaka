@@ -36,6 +36,8 @@ mGetstring MACRO promptUser, storeNum, byteLength
 	MOVE EDX, promptUser
 	MOVE ECX, byteLength
 	print_Text
+
+	MOVE EDX, storeNum
 	CALL ReadString
 	MOVE storeNum, EDX
 
@@ -68,9 +70,8 @@ plus_symbol				BYTE	"+",0
 minus_symbol			BYTE	"-",0
 decimal_symbol			BYTE	".",0
 
-store_Num				BYTE	STRINGLEN DUP(0)
+store_Num				BYTE	STRINGLEN DUP(0)	; STRINGLEN (4) * BYTE = 32 bits
 byte_string_len			DWORD	6					; 4 DWORDS = 32 bits. byte_string_len is at 6 (5 char + 0 null) to check if a string entered is > 4 DWORDs
-bytes_read				DWORD	0
 num_List				DWORD	ARRAYSIZE DUP(?)
 
 num_of_entries			DWORD	?
@@ -78,7 +79,7 @@ running_subtotal		SDWORD	?
 
 print_Text				EQU		<CALL WriteString>
 new_Line				EQU		<CALL CrLf>
-MOVE					TEXTEQU <MOV>					; Turns MOV into MOVE to help with text alignment with PUSH
+MOVE					TEXTEQU <MOV>				; Turns MOV into MOVE to help with text alignment with PUSH
 
 .code
 ;-----------------------------------------------------------------------------------------------------------
@@ -101,11 +102,12 @@ _enter_Num_Loop:
 	PUSH EDX
 	MOVE EAX, byte_string_len
 	PUSH EAX
-	MOVE EDX, OFFSET bytes_read
+	MOVE EDX, OFFSET error_Message
 	PUSH EDX
-	MOVE EDX, OFFSET num_List
-	PUSH EDX
+	MOVE EDI, OFFSET num_List
+	PUSH EDI
 	CALL ReadVal
+	ADD  EDI, TYPE num_List
 
 	LOOP _enter_Num_Loop
 
@@ -116,11 +118,11 @@ main ENDP
 ; Name: ReadVal
 ; Description: Invokes mGetString and translates the integers from strings to integers by subtracting 48 from their respective ASCII numbers 
 ; Preconditions: The calling procedure pushes the needed parameters to the stack
-; Postcondition:
+; Postcondition: All numbers entered by user are withing 32 bits and don't have symbols within them besides a positive or minus symbol
 ; Recieves:
 ;		[EBP + 8]  = OFFSET num_List 
-;		[EBP + 12] = OFFSET bytes_read 
-;		[EBP + 16] = OFFSET byte_string_len 
+;		[EBP + 12] = OFFSET error_Message
+;		[EBP + 16] = byte_string_len 
 ;		[EBP + 20] = OFFSET store_Num
 ;		[EBP + 24] = OFFSET prompt_User
 ; Return: 12 to derefence any parameters pushed to the stack
@@ -133,17 +135,23 @@ MOVE EBP, ESP
 	MOVE EDI, [EBP + 8]
 	MOVE ECX, [EBP + 16]
 	MOVE EBX, [EBP + 20]
+_call_mGetString:
 	MOVE EDX, [EBP + 24]
-
 	mGetString EDX, EBX, ECX
+	
+	; Check if string size is <= 32 bits. After mGetString is called the EAX will hold the value of the length of the string entered
+	CMP EAX, 4
+	JA _string_greater
+	JBE _string_equal
 
-	MOVE EDX, EBX
-	print_Text
-	MOVE [EDI], EDX
-
-	MOVE [EBP + 12], EAX
+_string_greater:
 	MOVE EDX, [EBP + 12]
 	print_Text
+	new_Line
+	JMP _call_mGetString
+
+_string_equal:
+	MOVE [EDI], EDX
 
 	POP ECX
 POP EBP
