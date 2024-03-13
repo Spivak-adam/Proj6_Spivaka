@@ -12,7 +12,8 @@ TITLE Low level I/O Procedures    (Proj6_Spivaka.asm)
 
 INCLUDE Irvine32.inc
 
-; (insert constant definitions here)
+ARRAYSIZE = 10
+STRINGLEN = 4
 
 ;-----------------------------------------------------------------------------------------------------------
 ; Name: mGetstring
@@ -23,26 +24,23 @@ INCLUDE Irvine32.inc
 ;		promptUser	- message to prompt user to enter numbers
 ;		storeNum	- parameter by reference to store value
 ;		byteLength	- the length a number can be to fit into a 32 bit register
+;		bytesRead	- numbers of bytes entered by user (length of string)
 ; Return:
 ;-----------------------------------------------------------------------------------------------------------
 mGetstring MACRO promptUser, storeNum, byteLength
+
+.code
 	PUSH EDX
-	PUSH EAX
 	PUSH ECX
 
-_enter_Num:
 	MOVE EDX, promptUser
+	MOVE ECX, byteLength
 	print_Text
-
 	CALL ReadString
-	MOVE ECX, 4
 	MOVE storeNum, EDX
-	
-	CMP EAX, byteLength
-	JE _valid_num_size
-	JA _enter_Num
 
-_valid_num_size:
+	POP ECX
+	POP EDX
 
 ENDM
 
@@ -59,9 +57,24 @@ mDisplayString MACRO
 ENDM
 
 .data
-intro_display			BYTE	"Programming assignment 6: Designing low-level I/O procedures",10,
+intro_Display			BYTE	"Programming assignment 6: Designing low-level I/O procedures",10,
 								"Written by: Adam Spivak",0
-prompt_user				BYTE	"Please enter number"
+user_Instructions		BYTE	"Please provide 10 signed decimal integers.",10,
+								"Each number needs to be small enough to fit inside a 32 bit register. After you have finished",10,
+								"inputting the raw numbers I will display a list of the integers, their sum, and their average value",0
+prompt_User				BYTE	"Please enter a signed number: ",0
+error_Message			BYTE	"ERROR: You did not enter a signed number or your number was too big.",0
+plus_symbol				BYTE	"+",0
+minus_symbol			BYTE	"-",0
+decimal_symbol			BYTE	".",0
+
+store_Num				BYTE	STRINGLEN DUP(0)
+byte_string_len			DWORD	6					; 4 DWORDS = 32 bits. byte_string_len is at 6 (5 char + 0 null) to check if a string entered is > 4 DWORDs
+bytes_read				DWORD	0
+num_List				DWORD	ARRAYSIZE DUP(?)
+
+num_of_entries			DWORD	?
+running_subtotal		SDWORD	?
 
 print_Text				EQU		<CALL WriteString>
 new_Line				EQU		<CALL CrLf>
@@ -70,19 +83,72 @@ MOVE					TEXTEQU <MOV>					; Turns MOV into MOVE to help with text alignment wit
 .code
 ;-----------------------------------------------------------------------------------------------------------
 ; Name: main
-; Description:
-
-; Preconditions:
-; Postcondition:
-; Recieves:
-; Return:
+; Description: Controls the rest of program by calling readVal 10 times with a LOOP statement to get 10 integers.
+; Once 10 integers have been recieved it will then use writeVal to print out the list of integers, their sum, and the truncated average.
+; Once the process for the 10 integers is over it will the same thing for 10 FPU numbers.
+; Preconditions: No numbers entered, and all initialized variables are empty
+; Postcondition: All variables related to 10 integers and 10 FPUs are filled and have values in them
+; Recieves: Global variables
+; Return: None
 ;-----------------------------------------------------------------------------------------------------------
 main PROC
 
+	MOVE ECX, ARRAYSIZE
+_enter_Num_Loop:
+	MOVE EDX, OFFSET prompt_User
+	PUSH EDX
+	MOVE EDX, OFFSET store_Num
+	PUSH EDX
+	MOVE EAX, byte_string_len
+	PUSH EAX
+	MOVE EDX, OFFSET bytes_read
+	PUSH EDX
+	MOVE EDX, OFFSET num_List
+	PUSH EDX
 	CALL ReadVal
+
+	LOOP _enter_Num_Loop
 
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
+
+;-----------------------------------------------------------------------------------------------------------
+; Name: ReadVal
+; Description: Invokes mGetString and translates the integers from strings to integers by subtracting 48 from their respective ASCII numbers 
+; Preconditions: The calling procedure pushes the needed parameters to the stack
+; Postcondition:
+; Recieves:
+;		[EBP + 8]  = OFFSET num_List 
+;		[EBP + 12] = OFFSET bytes_read 
+;		[EBP + 16] = OFFSET byte_string_len 
+;		[EBP + 20] = OFFSET store_Num
+;		[EBP + 24] = OFFSET prompt_User
+; Return: 12 to derefence any parameters pushed to the stack
+;-----------------------------------------------------------------------------------------------------------
+ReadVal PROC
+PUSH EBP
+MOVE EBP, ESP
+	PUSH ECX
+
+	MOVE EDI, [EBP + 8]
+	MOVE ECX, [EBP + 16]
+	MOVE EBX, [EBP + 20]
+	MOVE EDX, [EBP + 24]
+
+	mGetString EDX, EBX, ECX
+
+	MOVE EDX, EBX
+	print_Text
+	MOVE [EDI], EDX
+
+	MOVE [EBP + 12], EAX
+	MOVE EDX, [EBP + 12]
+	print_Text
+
+	POP ECX
+POP EBP
+RET 20
+ReadVal ENDP
 
 ;-----------------------------------------------------------------------------------------------------------
 ; Name:
@@ -92,15 +158,15 @@ main ENDP
 ; Recieves:
 ; Return:
 ;-----------------------------------------------------------------------------------------------------------
-ReadVal PROC
+WriteVal PROC
 PUSH EBP
 MOVE EBP, ESP
 
-	CALL mGetString
+
 
 POP EBP
 RET
-ReadVal ENDP
+WriteVal ENDP
 
 ;-----------------------------------------------------------------------------------------------------------
 ; Name:
