@@ -13,7 +13,8 @@ TITLE Low level I/O Procedures    (Proj6_Spivaka.asm)
 INCLUDE Irvine32.inc
 
 ARRAYSIZE = 10
-STRINGLEN = 4
+STRINGLEN = 12
+STRINGBYTELEN = 14
 
 ;-----------------------------------------------------------------------------------------------------------
 ; Name: mGetstring
@@ -23,18 +24,16 @@ STRINGLEN = 4
 ; Recieves:
 ;		promptUser	- message to prompt user to enter numbers
 ;		storeNum	- parameter by reference to store value
-;		byteLength	- the length a number can be to fit into a 32 bit register
-;		bytesRead	- numbers of bytes entered by user (length of string)
-; Return:
+;		
 ;-----------------------------------------------------------------------------------------------------------
-mGetstring MACRO promptUser, storeNum, byteLength
+mGetstring MACRO promptUser, storeNum
 
 .code
 	PUSH EDX
 	PUSH ECX
 
 	MOVE EDX, promptUser
-	MOVE ECX, byteLength
+	MOVE ECX, STRINGBYTELEN
 	print_Text
 
 	MOVE EDX, storeNum
@@ -70,8 +69,7 @@ plus_symbol				BYTE	"+",0
 minus_symbol			BYTE	"-",0
 decimal_symbol			BYTE	".",0
 
-store_Num				BYTE	STRINGLEN DUP(0)	; STRINGLEN (4) * BYTE = 32 bits
-byte_string_len			DWORD	6					; 4 DWORDS = 32 bits. byte_string_len is at 6 (5 char + 0 null) to check if a string entered is > 4 DWORDs
+store_Num				BYTE	4 DUP(0)	; 4 * BYTE = 32 bits
 num_List				DWORD	ARRAYSIZE DUP(?)
 
 num_of_entries			DWORD	?
@@ -100,8 +98,6 @@ _enter_Num_Loop:
 	PUSH EDX
 	MOVE EDX, OFFSET store_Num
 	PUSH EDX
-	MOVE EAX, byte_string_len
-	PUSH EAX
 	MOVE EDX, OFFSET error_Message
 	PUSH EDX
 	MOVE EDI, OFFSET num_List
@@ -122,9 +118,8 @@ main ENDP
 ; Recieves:
 ;		[EBP + 8]  = OFFSET num_List 
 ;		[EBP + 12] = OFFSET error_Message
-;		[EBP + 16] = byte_string_len 
-;		[EBP + 20] = OFFSET store_Num
-;		[EBP + 24] = OFFSET prompt_User
+;		[EBP + 16] = OFFSET store_Num
+;		[EBP + 20] = OFFSET prompt_User
 ; Return: 12 to derefence any parameters pushed to the stack
 ;-----------------------------------------------------------------------------------------------------------
 ReadVal PROC
@@ -132,15 +127,15 @@ PUSH EBP
 MOVE EBP, ESP
 	PUSH ECX
 
-	MOVE EDI, [EBP + 8]
-	MOVE ECX, [EBP + 16]
-	MOVE EBX, [EBP + 20]
 _call_mGetString:
-	MOVE EDX, [EBP + 24]
-	mGetString EDX, EBX, ECX
+	MOVE EDI, [EBP + 8]
+	MOVE EBX, [EBP + 16]
+	MOVE EDX, [EBP + 20]
+	mGetString EDX, EBX
 	
+	; First step of validation:
 	; Check if string size is <= 32 bits. After mGetString is called the EAX will hold the value of the length of the string entered
-	CMP EAX, 4
+	CMP EAX, STRINGLEN
 	JA _string_greater
 	JBE _string_equal
 
@@ -150,12 +145,16 @@ _string_greater:
 	new_Line
 	JMP _call_mGetString
 
+	; Second step of validation:
+	; Starts translating each CHAR in string from ASCII to digits and validates there are no numbers or symbols
 _string_equal:
+	
+
 	MOVE [EDI], EDX
 
 	POP ECX
 POP EBP
-RET 20
+RET 16
 ReadVal ENDP
 
 ;-----------------------------------------------------------------------------------------------------------
