@@ -13,7 +13,12 @@ TITLE Low level I/O Procedures    (Proj6_Spivaka.asm)
 INCLUDE Irvine32.inc
 
 ARRAYSIZE = 10
-STRINGLEN = 12
+BUFFERSIZE = 12
+STRINGLEN = 4
+TRANSLATINGCONSTANT = 10
+
+POS_SIGN = "+"
+NEG_SIGN = "="
 
 ;-----------------------------------------------------------------------------------------------------------
 ; Name: mGetstring
@@ -63,13 +68,12 @@ user_Instructions		BYTE	"Please provide 10 signed decimal integers.",10,
 								"inputting the raw numbers I will display a list of the integers, their sum, and their average value",0
 prompt_User				BYTE	"Please enter a signed number: ",0
 error_Message			BYTE	"ERROR: You did not enter a signed number or your number was too big.",0
-plus_symbol				BYTE	"+",0
-minus_symbol			BYTE	"-",0
-decimal_symbol			BYTE	".",0
 
-store_Num				BYTE	4 DUP(0)	; 4 * BYTE = 32 bits
+store_Num				BYTE	STRINGLEN DUP(0)	; 4 * BYTE = 32 bits
 num_List				DWORD	ARRAYSIZE DUP(?)
 
+translated_Num			SDWORD	0
+is_POS_BOOL				DWORD	0		; 0 = Positive Value, 1 = Negative Value
 num_of_entries			DWORD	?
 running_subtotal		SDWORD	?
 
@@ -92,6 +96,10 @@ main PROC
 
 	MOVE ECX, ARRAYSIZE
 _enter_Num_Loop:
+	MOVE EAX, is_POS_BOOL
+	PUSH EAX
+	MOVE EAX, translated_Num
+	PUSH EAX
 	MOVE EDX, OFFSET prompt_User
 	PUSH EDX
 	MOVE EDX, OFFSET store_Num
@@ -110,7 +118,13 @@ main ENDP
 
 ;-----------------------------------------------------------------------------------------------------------
 ; Name: ReadVal
-; Description: Invokes mGetString and translates the integers from strings to integers by subtracting 48 from their respective ASCII numbers 
+; Description: Invokes mGetString and translates the integers from strings to integers by subtracting 48 from their respective ASCII numbers.
+; It uses 4 conditions to check the string its translating numbers from. First condition, it checks if string size is <= 12. After mGetString is called
+; the EAX will hold the value of the length of the string entered. Second condition, it starts translating each CHAR in string from ASCII to digits and
+; validates there are no numbers or symbols. The third condition will iterate through the string and check for symbols within middle of string. If it encounters
+; symbol in middle of string it jumps to _invalid_String for invalid string. If first 3 conditions are met the string is a valid num and it will start translating.
+; After translating to a number from ASCII, check within range of a 32 bit SDWORD (-2^31 and 2^31-1), if it larger or smaller it will send it to _invalid_String
+; It will translate by subtracting 48 from each BYTE to represent current integer and multiply it by 10 to store the next num
 ; Preconditions: The calling procedure pushes the needed parameters to the stack
 ; Postcondition: All numbers entered by user are withing 32 bits and don't have symbols within them besides a positive or minus symbol
 ; Recieves:
@@ -118,6 +132,8 @@ main ENDP
 ;		[EBP + 12] = OFFSET error_Message
 ;		[EBP + 16] = OFFSET store_Num
 ;		[EBP + 20] = OFFSET prompt_User
+;		[EBP + 24] = translated_Num
+;		[EBP + 28] = is_POS_BOOL
 ; Return: 12 to derefence any parameters pushed to the stack
 ;-----------------------------------------------------------------------------------------------------------
 ReadVal PROC
@@ -132,27 +148,99 @@ _call_mGetString:
 	mGetString EDX, EBX
 	
 	; First step of validation:
-	; Check if string size is <= 12. After mGetString is called the EAX will hold the value of the length of the string entered
-	CMP EAX, STRINGLEN
-	JA _string_greater
-	JBE _string_equal
+	CMP EAX, BUFFERSIZE
+	JA _invalid_String
+	JBE _valid_String
 
-_string_greater:
+_invalid_String:
 	MOVE EDX, [EBP + 12]
 	print_Text
 	new_Line
 	JMP _call_mGetString
 
 	; Second step of validation:
-	; Starts translating each CHAR in string from ASCII to digits and validates there are no numbers or symbols
-_string_equal:
-	
+_valid_String:
+	MOVE EDX, [EBP + 16]
+	print_Text
 
-	MOVE [EDI], EDX
+	; First condition: Is the first CHAR a "+" or "-"
+	MOVE ECX, BUFFERSIZE - 1
+	MOVE ESI, [EBP + 16]		; Begining of list
+
+	CLD							; Clear direction flag to move up the string
+	MOVE EAX, 0					; Empty EAX to start translating and storing integer
+_iterating_String:
+	LODSB
+	CMP AL, POS_SIGN
+	JE _POS_VALUE
+	CMP AL, NEG_SIGN
+	JE _NEG_VALUE
+	; No pos or neg sign, so just start translating
+	JMP _start_Translating
+
+_POS_VALUE:
+	PUSH EAX
+	MOVE EAX, 0
+	MOVE [EBP + 28], EAX
+	INC ESI
+	POP EAX
+	JMP _start_Translating
+
+_NEG_VALUE:
+	PUSH EAX
+	MOVE EAX, 1
+	MOVE [EBP + 28], EAX
+	INC ESI
+	POP EAX
+	JMP _start_Translating
+
+_start_Translating:
+	; Second condition: no symbols in middle of string
+	CMP AL, 48
+	JB _is_Symbol
+	CMP AL, 57
+	JA _is_Symbol
+
+	; Finally, translation
+	SUB  AL, 48
+	MOVE [EBP + 24], AL
+	MOVE EBX, [EBP + 24]
+	CMP  ECX, 0
+	JE  _dont_multiply_constant
+	JNE _multiply_constant
+
+_dont_multiply_constant:
+	JMP _check_for_NEG				; ECX = 0, leave Number as is and check for NEG
+
+_multiply_constant:
+	ADD  EAX, EBX
+	MOVE EBX, TRANSLATINGCONSTANT
+	MUL  EAX
+	LOOP _iterating_string			; ECX != 0, Muliplty by 10 and move to next num
+
+_check_for_NEG:
+	CALL WriteDec
+
+	CMP is_POS_BOOL, 0
+	JNE _neg_Num
+	JMP _string_Translated
+
+_neg_Num:
+	MOVE EBX, 0
+	SUB  EBX, EAX
+	MOVE EAX, EBX
+	JMP _string_Translated
+
+_is_Symbol:
+	JMP _invalid_String
+
+_string_Translated:
+	MOVE [EDI], EAX	; Stores nums in list	
+	ADD  EDI, 4
 
 	POP ECX
 POP EBP
-RET 16
+RET 24
 ReadVal ENDP
 
 ;-----------------------------------------------------------------------------------------------------------
