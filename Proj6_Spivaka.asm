@@ -14,7 +14,6 @@ INCLUDE Irvine32.inc
 
 ARRAYSIZE = 10
 STRINGLEN = 12
-STRINGBYTELEN = 14
 
 ;-----------------------------------------------------------------------------------------------------------
 ; Name: mGetstring
@@ -28,12 +27,11 @@ STRINGBYTELEN = 14
 ;-----------------------------------------------------------------------------------------------------------
 mGetstring MACRO promptUser, storeNum
 
-.code
 	PUSH EDX
 	PUSH ECX
 
 	MOVE EDX, promptUser
-	MOVE ECX, STRINGBYTELEN
+	MOVE ECX, 14			; A string can only be 12-characters in order to fit into a 32-bit register. 14 is to test if greater than 12 char
 	print_Text
 
 	MOVE EDX, storeNum
@@ -134,7 +132,7 @@ _call_mGetString:
 	mGetString EDX, EBX
 	
 	; First step of validation:
-	; Check if string size is <= 32 bits. After mGetString is called the EAX will hold the value of the length of the string entered
+	; Check if string size is <= 12. After mGetString is called the EAX will hold the value of the length of the string entered
 	CMP EAX, STRINGLEN
 	JA _string_greater
 	JBE _string_equal
