@@ -18,7 +18,7 @@ STRINGLEN = 4
 TRANSLATINGCONSTANT = 10
 
 POS_SIGN = "+"
-NEG_SIGN = "="
+NEG_SIGN = "-"
 
 ;-----------------------------------------------------------------------------------------------------------
 ; Name: mGetstring
@@ -70,7 +70,7 @@ prompt_User				BYTE	"Please enter a signed number: ",0
 error_Message			BYTE	"ERROR: You did not enter a signed number or your number was too big.",0
 
 store_Num				BYTE	STRINGLEN DUP(0)	; 4 * BYTE = 32 bits
-num_List				DWORD	ARRAYSIZE DUP(?)
+num_List				SDWORD	ARRAYSIZE DUP(?)
 
 translated_Num			SDWORD	0
 is_POS_BOOL				DWORD	0		; 0 = Positive Value, 1 = Negative Value
@@ -109,7 +109,6 @@ _enter_Num_Loop:
 	MOVE EDI, OFFSET num_List
 	PUSH EDI
 	CALL ReadVal
-	ADD  EDI, TYPE num_List
 
 	LOOP _enter_Num_Loop
 
@@ -153,6 +152,9 @@ _call_mGetString:
 	JBE _valid_String
 
 _invalid_String:
+	MOVE EAX, 0
+	MOVE [EBP + 24], EAX		; Ensures the translated_Num is 0 before starting
+	MOVE [EBP + 28], EAX 		; Ensures the is_POS_BOOL isn't set just yet
 	MOVE EDX, [EBP + 12]
 	print_Text
 	new_Line
@@ -160,11 +162,8 @@ _invalid_String:
 
 	; Second step of validation:
 _valid_String:
-	MOVE EDX, [EBP + 16]
-	print_Text
-
 	; First condition: Is the first CHAR a "+" or "-"
-	MOVE ECX, BUFFERSIZE - 1
+	MOVE ECX, EAX				; EAX containts the length of the entered string
 	MOVE ESI, [EBP + 16]		; Begining of list
 
 	CLD							; Clear direction flag to move up the string
@@ -172,26 +171,42 @@ _valid_String:
 _iterating_String:
 	LODSB
 	CMP AL, POS_SIGN
-	JE _POS_VALUE
+	JE _POS_VALUE_CHECK			; Check if sign is at beginning of String
 	CMP AL, NEG_SIGN
-	JE _NEG_VALUE
+	JE _NEG_VALUE_CHECK			; Check if sign is at beginning of String
 	; No pos or neg sign, so just start translating
 	JMP _start_Translating
+
+_POS_VALUE_CHECK:
+	MOVE EAX, [EBP + 16]
+	INC  EAX
+	CMP  ESI, EAX
+	JA   _invalid_String		; If ESI is not beginning of string
+	JE   _POS_VALUE
+
+_NEG_VALUE_CHECK:
+	MOVE EAX, [EBP + 16]
+	INC  EAX
+	CMP  ESI, EAX
+	JA   _invalid_String		; If ESI is not beginning of string
+	JE   _NEG_VALUE
 
 _POS_VALUE:
 	PUSH EAX
 	MOVE EAX, 0
 	MOVE [EBP + 28], EAX
-	INC ESI
 	POP EAX
+	DEC ECX
+	LODSB
 	JMP _start_Translating
 
 _NEG_VALUE:
 	PUSH EAX
 	MOVE EAX, 1
 	MOVE [EBP + 28], EAX
-	INC ESI
 	POP EAX
+	DEC ECX
+	LODSB
 	JMP _start_Translating
 
 _start_Translating:
@@ -203,9 +218,8 @@ _start_Translating:
 
 	; Finally, translation
 	SUB  AL, 48
-	MOVE [EBP + 24], AL
-	MOVE EBX, [EBP + 24]
-	CMP  ECX, 0
+	ADD [EBP + 24], AL
+	CMP  ECX, 1			; If ECX = 0, at end of string
 	JE  _dont_multiply_constant
 	JNE _multiply_constant
 
@@ -213,28 +227,32 @@ _dont_multiply_constant:
 	JMP _check_for_NEG				; ECX = 0, leave Number as is and check for NEG
 
 _multiply_constant:
-	ADD  EAX, EBX
+	MOVE EBX, [EBP + 24]
+	MOVE EAX, EBX
 	MOVE EBX, TRANSLATINGCONSTANT
-	MUL  EAX
+	MUL  EBX
+
+	MOVE [EBP + 24], EAX
 	LOOP _iterating_string			; ECX != 0, Muliplty by 10 and move to next num
 
 _check_for_NEG:
-	CALL WriteDec
-
-	CMP is_POS_BOOL, 0
+	MOVE EAX, [EBP + 28]
+	CMP  EAX, 0
 	JNE _neg_Num
 	JMP _string_Translated
 
 _neg_Num:
-	MOVE EBX, 0
-	SUB  EBX, EAX
-	MOVE EAX, EBX
+	NEG SDWORD PTR [EBP + 24]
 	JMP _string_Translated
 
 _is_Symbol:
 	JMP _invalid_String
 
 _string_Translated:
+	MOVE EAX, [EBP + 24]
+	CALL WriteInt
+	new_Line 
+
 	MOVE [EDI], EAX	; Stores nums in list	
 	ADD  EDI, 4
 
