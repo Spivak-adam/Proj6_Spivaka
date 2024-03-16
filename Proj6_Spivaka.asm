@@ -16,6 +16,7 @@ ARRAYSIZE = 10
 BUFFERSIZE = 12
 STRINGLEN = 4
 TRANSLATINGCONSTANT = 10
+ASCIICONSTANT = 48
 
 POS_SIGN = "+"
 NEG_SIGN = "-"
@@ -28,7 +29,6 @@ NEG_SIGN = "-"
 ; Recieves:
 ;		promptUser	- message to prompt user to enter numbers
 ;		storeNum	- parameter by reference to store value
-;		
 ;-----------------------------------------------------------------------------------------------------------
 mGetstring MACRO promptUser, storeNum
 
@@ -50,13 +50,15 @@ ENDM
 
 ;-----------------------------------------------------------------------------------------------------------
 ; Name: mDisplayString
-; Description:
-; Preconditions:
-; Postcondition:
+; Description: prints string stored at specified memory
+; Preconditions: The string to be printed is sent to Marco by parameters
+; Postcondition: String is printed by MACRO
 ; Recieves:
-; Return:
+;		messageForUser - A string to be printed by the MACRO
 ;-----------------------------------------------------------------------------------------------------------
-mDisplayString MACRO
+mDisplayString MACRO	messageForUser
+	MOVE EDX, messageForUser
+	print_Text
 
 ENDM
 
@@ -68,14 +70,18 @@ user_Instructions		BYTE	"Please provide 10 signed decimal integers.",10,
 								"inputting the raw numbers I will display a list of the integers, their sum, and their average value",0
 prompt_User				BYTE	"Please enter a signed number: ",0
 error_Message			BYTE	"ERROR: You did not enter a signed number or your number was too big.",0
+you_Have_Entered		BYTE	"You have entered the following numbers:",10,0
+sum_Of_Num_Msg			BYTE	"The sum of these Numbers is: ",0
+trunct_Avg				BYTE	"The truncated average is: ",0
 
 store_Num				BYTE	STRINGLEN DUP(0)	; 4 * BYTE = 32 bits
+translate_Num			SDWORD	STRINGLEN DUP(0)	; Used to translate SDWORD val to string
 num_List				SDWORD	ARRAYSIZE DUP(?)
 
 translated_Num			SDWORD	0
-is_POS_BOOL				DWORD	0		; 0 = Positive Value, 1 = Negative Value
-num_of_entries			DWORD	?
-running_subtotal		SDWORD	?
+is_POS_BOOL				DWORD	0					; 0 = Positive Value, 1 = Negative Value
+num_of_entries			DWORD	0
+running_subtotal		SDWORD	0
 
 print_Text				EQU		<CALL WriteString>
 new_Line				EQU		<CALL CrLf>
@@ -93,13 +99,11 @@ MOVE					TEXTEQU <MOV>				; Turns MOV into MOVE to help with text alignment with
 ; Return: None
 ;-----------------------------------------------------------------------------------------------------------
 main PROC
-	MOVE EDX, OFFSET intro_Display
-	print_Text
+	mDisplayString OFFSET intro_Display
 	new_Line
 	new_Line
 
-	MOVE EDX, OFFSET user_Instructions
-	print_Text
+	mDisplayString OFFSET user_Instructions
 	new_Line
 	new_Line
 
@@ -120,6 +124,23 @@ _enter_Num_Loop:
 	CALL ReadVal
 
 	LOOP _enter_Num_Loop
+
+	mDisplayString OFFSET you_Have_Entered
+	MOVE ECX, LENGTHOF num_List
+_disp_and_sum:
+	MOVE EDX, OFFSET store_Num		; Pushes the string to use for later
+	PUSH EDX
+	MOVE ESI, OFFSET num_List		; Pushes value stored at ESI from num_List
+	PUSH [ESI]
+	CALL WriteVal
+
+	MOVE EAX, running_subtotal
+	ADD  EAX, [ESI]
+	ADD  ESI, TYPE num_List
+	CALL WriteInt
+
+	LOOP _disp_and_Sum
+	
 
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
@@ -142,7 +163,7 @@ main ENDP
 ;		[EBP + 20] = OFFSET prompt_User
 ;		[EBP + 24] = translated_Num
 ;		[EBP + 28] = is_POS_BOOL
-; Return: 12 to derefence any parameters pushed to the stack
+; Return: 24 to derefence any parameters pushed to the stack
 ;-----------------------------------------------------------------------------------------------------------
 ReadVal PROC
 PUSH EBP
@@ -168,7 +189,7 @@ _invalid_String:
 	MOVE [EBP + 24], EAX		; Ensures the translated_Num is 0 before starting
 	MOVE [EBP + 28], EAX 		; Ensures the is_POS_BOOL isn't set just yet
 	MOVE EDX, [EBP + 12]
-	print_Text
+	mDisplayString EDX
 	new_Line
 	JMP _call_mGetString
 
@@ -223,13 +244,13 @@ _NEG_VALUE:
 
 _start_Translating:
 	; Second condition: no symbols in middle of string
-	CMP AL, 48
+	CMP AL, ASCIICONSTANT
 	JB _is_Symbol
-	CMP AL, 57
+	CMP AL, ASCIICONSTANT + 9
 	JA _is_Symbol
 
 	; Finally, translation
-	SUB  AL, 48
+	SUB  AL, ASCIICONSTANT
 	ADD [EBP + 24], AL
 	CMP  ECX, 1						; If ECX = 1, at end of string
 	JE  _dont_multiply_constant
@@ -263,9 +284,6 @@ _is_Symbol:
 
 _string_Translated:
 	MOVE EAX, [EBP + 24]
-	CALL WriteInt
-	new_Line 
-
 	MOVE [EDI], EAX	; Stores nums in list	
 	ADD  EDI, 4
 
@@ -275,19 +293,34 @@ RET 24
 ReadVal ENDP
 
 ;-----------------------------------------------------------------------------------------------------------
-; Name:
-; Description:
-; Preconditions:
-; Postcondition:
+; Name: WriteVal
+; Description: Takes in signed integer and translates it to their respective ASCII Values and prints out the string of values. Only a 
+; few conditions are needed in order for this PROC to works: The first condition, if the number is negative or positive by checking the sign
+; flag. If sign flag is set, and the number is negative, it would put a "-" in front. If it's positive it will just move to the next value.
+; The second coniditon will be to just increment through the signed integer until it reaches the end, translating each number to ASCII values on the way.
+; Preconditions: Any string values that were taken in by the ReadVal procedure have been translated into signed integers. It does this
+; by iterating through a string of numbers and adding 48 to convert them to their repsecitve ASCII values and saves it byte-by-byte
+; to build a new string of characters
+; Postcondition: Prints out a string of values after they are converted from numbers to chars
 ; Recieves:
-; Return:
+;		[EBP + 8] = Signed number to be translated to string
+;		[EBP + 12] = OFFSET store_Num
+; Return: 
 ;-----------------------------------------------------------------------------------------------------------
 WriteVal PROC
 PUSH EBP
 MOVE EBP, ESP
+	MOVE ESI, [EBP + 8]
+	MOVE EDI, [EBP + 12]
+	MOVE ECX, BUFFERSIZE
 
+	CLD
+	LODSD					; Load signed number into ESI
 
+	ADD AL, ASCIICONSTANT
+	STOSB
 
+	mDisplayString EDX
 POP EBP
 RET
 WriteVal ENDP
