@@ -93,6 +93,15 @@ MOVE					TEXTEQU <MOV>				; Turns MOV into MOVE to help with text alignment with
 ; Return: None
 ;-----------------------------------------------------------------------------------------------------------
 main PROC
+	MOVE EDX, OFFSET intro_Display
+	print_Text
+	new_Line
+	new_Line
+
+	MOVE EDX, OFFSET user_Instructions
+	print_Text
+	new_Line
+	new_Line
 
 	MOVE ECX, ARRAYSIZE
 _enter_Num_Loop:
@@ -147,6 +156,9 @@ _call_mGetString:
 	mGetString EDX, EBX
 	
 	; First step of validation:
+	MOVE EBX, 0
+	CMP  EAX, EBX
+	JE  _invalid_string
 	CMP EAX, BUFFERSIZE
 	JA _invalid_String
 	JBE _valid_String
@@ -219,12 +231,12 @@ _start_Translating:
 	; Finally, translation
 	SUB  AL, 48
 	ADD [EBP + 24], AL
-	CMP  ECX, 1			; If ECX = 0, at end of string
+	CMP  ECX, 1						; If ECX = 1, at end of string
 	JE  _dont_multiply_constant
 	JNE _multiply_constant
 
 _dont_multiply_constant:
-	JMP _check_for_NEG				; ECX = 0, leave Number as is and check for NEG
+	JMP _check_for_NEG				; ECX = 1, leave Number as is and check for NEG
 
 _multiply_constant:
 	MOVE EBX, [EBP + 24]
@@ -232,6 +244,7 @@ _multiply_constant:
 	MOVE EBX, TRANSLATINGCONSTANT
 	MUL  EBX
 
+	JO _invalid_String
 	MOVE [EBP + 24], EAX
 	LOOP _iterating_string			; ECX != 0, Muliplty by 10 and move to next num
 
