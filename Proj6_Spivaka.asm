@@ -21,6 +21,9 @@ ASCIICONSTANT = 48
 POS_SIGN = "+"
 NEG_SIGN = "-"
 
+NEGBOUNDSDWORD = -2147483648
+POSBOUNDSDWORD = 2147483647
+
 ;-----------------------------------------------------------------------------------------------------------
 ; Name: mGetstring
 ; Description: A macro that recieves three parameters and gets numbers from user, then sends that number back to Called PRROC
@@ -29,8 +32,9 @@ NEG_SIGN = "-"
 ; Recieves:
 ;		promptUser	- message to prompt user to enter numbers
 ;		storeNum	- parameter by reference to store value
+;		stringLen	- Length of string from EAX
 ;-----------------------------------------------------------------------------------------------------------
-mGetstring MACRO promptUser, storeNum
+mGetstring MACRO promptUser, storeNum, stringLen
 
 	PUSH EDX
 	PUSH ECX
@@ -42,6 +46,7 @@ mGetstring MACRO promptUser, storeNum
 	MOVE EDX, storeNum
 	CALL ReadString
 	MOVE storeNum, EDX
+	MOVE stringLen, EAX
 
 	POP ECX
 	POP EDX
@@ -74,10 +79,11 @@ you_Have_Entered		BYTE	"You have entered the following numbers:",10,0
 sum_Of_Num_Msg			BYTE	"The sum of these Numbers is: ",0
 trunct_Avg				BYTE	"The truncated average is: ",0
 
-store_Num				BYTE	STRINGLEN DUP(0)	; 4 * BYTE = 32 bits
-translate_Num			SDWORD	STRINGLEN DUP(0)	; Used to translate SDWORD val to string
-num_List				SDWORD	ARRAYSIZE DUP(?)
+store_Num				BYTE	BUFFERSIZE DUP(?)
+num_List				SDWORD	ARRAYSIZE DUP(0)
+string_Length_List		SDWORD	ARRAYSIZE DUP(0)
 
+string_Length			SDWORD	0
 translated_Num			SDWORD	0
 is_POS_BOOL				DWORD	0					; 0 = Positive Value, 1 = Negative Value
 num_of_entries			DWORD	0
@@ -106,9 +112,14 @@ main PROC
 	mDisplayString OFFSET user_Instructions
 	new_Line
 	new_Line
-
+	
+	MOVE EDI, OFFSET num_List
+	MOVE ESI, OFFSET string_Length_List
 	MOVE ECX, ARRAYSIZE
 _enter_Num_Loop:
+	PUSH ESI						
+	MOVE EAX, string_Length
+	PUSH EAX
 	MOVE EAX, is_POS_BOOL
 	PUSH EAX
 	MOVE EAX, translated_Num
@@ -119,18 +130,52 @@ _enter_Num_Loop:
 	PUSH EDX
 	MOVE EDX, OFFSET error_Message
 	PUSH EDX
-	MOVE EDI, OFFSET num_List
 	PUSH EDI
 	CALL ReadVal
+	
+	MOVE EAX, running_Subtotal
+	ADD  EAX, [EDI]
+	MOVE running_Subtotal, EAX
+
+	ADD  ESI, TYPE string_Length_List
+	ADD  EDI, TYPE num_List
 
 	LOOP _enter_Num_Loop
+
+	; DELETE BEFORE SUBMISSION!!!
+
+	MOVE ECX, 10
+	MOVE ESI, OFFSET num_List
+_display_List:
+	MOVE EAX, [ESI]
+	CALL WriteInt
+	ADD  ESI, TYPE num_List
+	new_Line
+
+	LOOP _display_List
+
+	MOVE ECX, 10
+	MOVE ESI, OFFSET string_Length_List
+_display_List_2:
+	MOVE EAX, [ESI]
+	CALL WriteInt
+	ADD  ESI, TYPE string_Length_List
+	new_Line
+
+	LOOP _display_List_2
+
+
+	; DELETE BEFORE SUBMISSION!!!
+
 
 	mDisplayString OFFSET you_Have_Entered
 	MOVE ECX, LENGTHOF num_List
 _disp_and_sum:
-	MOVE EDX, OFFSET store_Num		; Pushes the string to use for later
+	MOVE EDI, OFFSET string_Length_List	; Used to calculation
+	PUSH EDI
+	MOVE EDX, OFFSET store_Num			; Pushes the string to use for later
 	PUSH EDX
-	MOVE ESI, OFFSET num_List		; Pushes value stored at ESI from num_List
+	MOVE ESI, OFFSET num_List			; Pushes value stored at ESI from num_List
 	PUSH [ESI]
 	CALL WriteVal
 
@@ -163,7 +208,9 @@ main ENDP
 ;		[EBP + 20] = OFFSET prompt_User
 ;		[EBP + 24] = translated_Num
 ;		[EBP + 28] = is_POS_BOOL
-; Return: 24 to derefence any parameters pushed to the stack
+;		[EBP + 32] = string_Length
+;		[EBP + 36] = OFFSET string_Length_List
+; Return: 32 to derefence any parameters pushed to the stack
 ;-----------------------------------------------------------------------------------------------------------
 ReadVal PROC
 PUSH EBP
@@ -171,13 +218,14 @@ MOVE EBP, ESP
 	PUSH ECX
 
 _call_mGetString:
-	MOVE EDI, [EBP + 8]
 	MOVE EBX, [EBP + 16]
 	MOVE EDX, [EBP + 20]
-	mGetString EDX, EBX
+	MOVE EAX, [EBP + 32]
+	mGetString EDX, EBX, EAX
+	MOVE [EBP + 32], EAX
 	
 	; First step of validation:
-	MOVE EBX, 0
+	MOVE EBX, 0					; Checks if list is size zero
 	CMP  EAX, EBX
 	JE  _invalid_string
 	CMP EAX, BUFFERSIZE
@@ -228,6 +276,11 @@ _POS_VALUE:
 	PUSH EAX
 	MOVE EAX, 0
 	MOVE [EBP + 28], EAX
+
+	MOVE EAX, [EBP + 32]
+	DEC EAX						; Decrements string length to not account for positive sign
+	MOVE [EBP + 32], EAX
+
 	POP EAX
 	DEC ECX
 	LODSB
@@ -237,6 +290,11 @@ _NEG_VALUE:
 	PUSH EAX
 	MOVE EAX, 1
 	MOVE [EBP + 28], EAX
+
+	MOVE EAX, [EBP + 32]
+	DEC EAX						; Decrements string length to not account for positive sign
+	MOVE [EBP + 32], EAX
+
 	POP EAX
 	DEC ECX
 	LODSB
@@ -284,12 +342,25 @@ _is_Symbol:
 
 _string_Translated:
 	MOVE EAX, [EBP + 24]
+	CMP  EAX, NEGBOUNDSDWORD
+	JL	 _invalid_String
+	CMP  EAX, POSBOUNDSDWORD
+	JG	 _invalid_String
+
+	PUSH EDI
+	MOVE ESI, [EBP + 36]
+	MOVE EDI, ESI
+	MOVE EAX, [EBP + 32]
+	MOVE [EDI], EAX
+	POP EDI
+
+	MOVE EAX, [EBP + 24]
+	MOVE EDI, [EBP + 8]
 	MOVE [EDI], EAX	; Stores nums in list	
-	ADD  EDI, 4
 
 	POP ECX
 POP EBP
-RET 24
+RET 32
 ReadVal ENDP
 
 ;-----------------------------------------------------------------------------------------------------------
@@ -314,51 +385,10 @@ MOVE EBP, ESP
 	MOVE EDI, [EBP + 12]
 	MOVE ECX, BUFFERSIZE
 
-	CLD
-	LODSD					; Load signed number into ESI
-
-	ADD AL, ASCIICONSTANT
-	STOSB
 
 	mDisplayString EDX
 POP EBP
 RET
 WriteVal ENDP
-
-;-----------------------------------------------------------------------------------------------------------
-; Name:
-; Description:
-; Preconditions:
-; Postcondition:
-; Recieves:
-; Return:
-;-----------------------------------------------------------------------------------------------------------
-ReadFloatVal PROC
-PUSH EBP
-MOVE EBP, ESP
-
-
-
-POP EBP
-RET
-ReadFloatVal ENDP
-
-;-----------------------------------------------------------------------------------------------------------
-; Name:
-; Description:
-; Preconditions:
-; Postcondition:
-; Recieves:
-; Return:
-;-----------------------------------------------------------------------------------------------------------
-WriteFloatVal PROC
-PUSH EBP
-MOVE EBP, ESP
-
-
-
-POP EBP
-RET
-WriteFloatVal ENDP
 
 END main
