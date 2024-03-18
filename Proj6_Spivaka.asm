@@ -61,9 +61,29 @@ ENDM
 ; Recieves:
 ;		messageForUser - A string to be printed by the MACRO
 ;-----------------------------------------------------------------------------------------------------------
-mDisplayString MACRO	messageForUser
+mDisplayString MACRO messageForUser
 	MOVE EDX, messageForUser
 	print_Text
+
+ENDM
+
+;-----------------------------------------------------------------------------------------------------------
+; Name: mMultiplyTens
+; Description: Multiplys 10s out a certain ten or hundreds place to divide integer and get an individual number
+; Postcondition: Multiplys a value by 10 x amount of times
+; Recieves:
+;		stringLength - How many times to multiply a value by 10s
+;-----------------------------------------------------------------------------------------------------------
+mMultiplyTens MACRO numToMul, stringLen
+	LOCAL _multiply_tens
+	MOVE EAX, numToMul
+	MOVE ECX, stringLen
+	DEC  ECX
+
+_multiply_tens:
+	MOVE EBX, 10
+	MUL  EBX
+	LOOP _multiply_tens
 
 ENDM
 
@@ -78,6 +98,7 @@ error_Message			BYTE	"ERROR: You did not enter a signed number or your number wa
 you_Have_Entered		BYTE	"You have entered the following numbers:",10,0
 sum_Of_Num_Msg			BYTE	"The sum of these Numbers is: ",0
 trunct_Avg				BYTE	"The truncated average is: ",0
+comma_display			BYTE	", ",0 
 
 store_Num				BYTE	BUFFERSIZE DUP(?)
 num_List				SDWORD	ARRAYSIZE DUP(0)
@@ -105,6 +126,9 @@ MOVE					TEXTEQU <MOV>				; Turns MOV into MOVE to help with text alignment with
 ; Return: None
 ;-----------------------------------------------------------------------------------------------------------
 main PROC
+	;CALL Testing
+
+	; Greets user and displays Instructions
 	mDisplayString OFFSET intro_Display
 	new_Line
 	new_Line
@@ -113,9 +137,11 @@ main PROC
 	new_Line
 	new_Line
 	
+	; Starts taking numbers from User
 	MOVE EDI, OFFSET num_List
 	MOVE ESI, OFFSET string_Length_List
 	MOVE ECX, ARRAYSIZE
+
 _enter_Num_Loop:
 	PUSH ESI						
 	MOVE EAX, string_Length
@@ -142,50 +168,29 @@ _enter_Num_Loop:
 
 	LOOP _enter_Num_Loop
 
-	; DELETE BEFORE SUBMISSION!!!
-
-	MOVE ECX, 10
-	MOVE ESI, OFFSET num_List
-_display_List:
-	MOVE EAX, [ESI]
-	CALL WriteInt
-	ADD  ESI, TYPE num_List
-	new_Line
-
-	LOOP _display_List
-
-	MOVE ECX, 10
-	MOVE ESI, OFFSET string_Length_List
-_display_List_2:
-	MOVE EAX, [ESI]
-	CALL WriteInt
-	ADD  ESI, TYPE string_Length_List
-	new_Line
-
-	LOOP _display_List_2
-
-
-	; DELETE BEFORE SUBMISSION!!!
-
-
+	; Display List of Integers
 	mDisplayString OFFSET you_Have_Entered
 	MOVE ECX, LENGTHOF num_List
+	MOVE ESI, OFFSET num_List			; Pushes value stored at ESI from num_List
 _disp_and_sum:
-	MOVE EDI, OFFSET string_Length_List	; Used to calculation
-	PUSH EDI
 	MOVE EDX, OFFSET store_Num			; Pushes the string to use for later
 	PUSH EDX
-	MOVE ESI, OFFSET num_List			; Pushes value stored at ESI from num_List
 	PUSH [ESI]
 	CALL WriteVal
-
-	MOVE EAX, running_subtotal
-	ADD  EAX, [ESI]
-	ADD  ESI, TYPE num_List
-	CALL WriteInt
+	mDisplayString OFFSET comma_display
+	
+	ADD ESI, TYPE num_List
 
 	LOOP _disp_and_Sum
-	
+	new_Line
+
+	; Display Sum of the numbers
+	mDisplayString OFFSET sum_Of_Num_Msg
+	MOVE EDX, OFFSET store_Num			; Pushes the string to use for later
+	MOVE ESI, OFFSET num_List			; Pushes value stored at ESI from num_List
+	PUSH EDX
+	PUSH [ESI]
+	CALL WriteVal
 
 	Invoke ExitProcess,0	; exit to operating system
 main ENDP
@@ -374,21 +379,170 @@ ReadVal ENDP
 ; to build a new string of characters
 ; Postcondition: Prints out a string of values after they are converted from numbers to chars
 ; Recieves:
-;		[EBP + 8] = Signed number to be translated to string
-;		[EBP + 12] = OFFSET store_Num
+;		[EBP + 8]	= OFFSET num_List, Signed number to be translated to string
+;		[EBP + 12]	= OFFSET store_Num, an array of BYTEs used to store translated numbers
 ; Return: 
 ;-----------------------------------------------------------------------------------------------------------
 WriteVal PROC
 PUSH EBP
 MOVE EBP, ESP
-	MOVE ESI, [EBP + 8]
+PUSH ECX
 	MOVE EDI, [EBP + 12]
-	MOVE ECX, BUFFERSIZE
+	MOVE EAX, [EBP + 8]		; Number to index through
 
+	; Find length of Integer
+	MOVE ECX, 0
+_find_integer_Len:
+	MOVE EDX, 0 
+	MOVE EBX, 10
+	CMP  EAX, 0
+	JZ _found_len
+	
+	INC ECX
+	DIV EBX
 
+	JMP _find_integer_Len
+
+_found_len:
+	PUSH ECX	; Save ECX for later use
+	CMP  ECX, 10
+	JAE	 _check_if_NEG
+	JNE  _write_POS_Symbol			; Number is positive
+
+_check_if_NEG:
+	; Check if Negative and turn it positive for 2s-compliment
+	MOVE EAX, 1
+	mMultiplyTens EAX, ECX
+	MOVE EBX, EAX
+
+	MOVE EAX, [EBP + 8]
+	MOVE EDX, 0
+	DIV  EBX
+
+	CMP EAX, 4
+	JAE _is_NEG
+	CMP EAX, 3
+	JAE _is_Neg
+
+	POP  ECX
+	PUSH ECX
+	MOVE EAX, 1
+	DEC  ECX
+	mMultiplyTens EAX, ECX
+	MOVE EBX, EAX
+
+	CMP EAX, 22
+	JA _is_Neg
+
+_is_NEG:
+	MOVE EAX, [EBP + 8]
+	NEG EAX
+	PUSH EAX
+	
+	; Find length of Integer now that it's POS
+	MOVE ECX, 0
+_find_integer_Len_2:
+	MOVE EDX, 0 
+	MOVE EBX, 10
+	CMP  EAX, 0
+	JZ _write_NEG_Symbol
+	
+	INC ECX
+	DIV EBX
+
+	JMP _find_integer_Len_2
+
+_write_NEG_Symbol:
+	POP  EAX
+	PUSH EAX
+	MOVE EAX, NEG_SIGN
+	STOSB
+	POP  EAX
+	JMP _translate_Num
+
+_write_POS_Symbol:
+	PUSH EAX
+	MOVE EAX, POS_SIGN
+	STOSB
+	POP EAX
+	JMP _translate_Num
+
+_translate_Num:
+	POP  ECX
+	PUSH ECX
+	PUSH EAX
+	MOVE EAX, 1
+	mMultiplyTens EAX, ECX
+
+	MOVE EBX, EAX
+	POP  EAX
+	DIV  EBX
+
+	ADD AL, ASCIICONSTANT
+	STOSB
+	MOVE EAX, EDX
+	POP  ECX
+
+	CMP ECX, 2
+	JE _dec_ECX
+	JNE _keep_Looping
+
+_dec_ECX:
+	ADD AL, ASCIICONSTANT
+	STOSB
+	JMP _break_Loop
+
+_keep_Looping:
+	MOVE EAX, ECX
+	DEC  EAX
+	PUSH EAX
+	MOVE EAX, EDX
+	LOOP _translate_Num
+
+_break_Loop:
+	MOVE EDX, [EBP + 12]
 	mDisplayString EDX
+
+POP ECX
 POP EBP
-RET
+RET 8
 WriteVal ENDP
+
+;Name: Testing
+; Description: Used to test reading and writing one value instead of working through an array of them
+; Return: None
+Testing PROC
+;TESTING!!!!!!!!
+	MOVE EDI, OFFSET num_List
+	MOVE ESI, OFFSET string_Length_List
+	PUSH ESI						
+	MOVE EAX, string_Length
+	PUSH EAX
+	MOVE EAX, is_POS_BOOL
+	PUSH EAX
+	MOVE EAX, translated_Num
+	PUSH EAX
+	MOVE EDX, OFFSET prompt_User
+	PUSH EDX
+	MOVE EDX, OFFSET store_Num
+	PUSH EDX
+	MOVE EDX, OFFSET error_Message
+	PUSH EDX
+	PUSH EDI
+	CALL ReadVal
+
+	MOVE EDI, OFFSET string_Length_List	; Used to calculation
+	PUSH EDI
+	MOVE EDX, OFFSET store_Num			; Pushes the string to use for later
+	PUSH EDX
+	MOVE ESI, OFFSET num_List			; Pushes value stored at ESI from num_List
+	PUSH ESI
+	CALL WriteVal
+
+	new_Line
+	new_Line
+	new_Line
+
+Testing ENDP
 
 END main
