@@ -35,27 +35,18 @@ POSBOUNDSDWORD = 2147483647
 ;		entryNum	- running subtotal of all integers entered
 ;		promptUser2 - End of prompt user
 ;-----------------------------------------------------------------------------------------------------------
-mGetstring MACRO promptUser, storeNum, entryNum, promptUser2
+mGetstring MACRO promptUser, storeNum
 	PUSH EDX
 	PUSH ECX
 
 	MOVE EDX, promptUser
 	print_Text
 
-	MOVE EDI, storeNum
-	PUSH EDI
-	MOVE EAX, entryNum
-	PUSH EAX
-	CALL writeVal
-
-	MOVE EDX, promptUser2
-	mDisplayString EDX
-
 	MOVE ECX, 14			; A string can only be 12-characters in order to fit into a 32-bit register. 14 is to test if greater than 12 char
 	MOVE EDX, storeNum
 	CALL ReadString
 	MOVE storeNum, EDX
-
+	
 	POP ECX
 	POP EDX
 
@@ -101,12 +92,12 @@ intro_Display			BYTE	"Programming assignment 6: Designing low-level I/O procedur
 user_Instructions		BYTE	"Please provide 10 signed decimal integers.",10,
 								"Each number needs to be small enough to fit inside a 32 bit register. After you have finished",10,
 								"inputting the raw numbers I will display a list of the integers, their sum, and their average value",0
-prompt_User				BYTE	". Please enter a signed number(",0
-prompt_User_2			BYTE	"): ",0
+prompt_User				BYTE	". Please enter a signed number: ",0
 error_Message			BYTE	"ERROR: You did not enter a signed number or your number was too big.",0
 you_Have_Entered		BYTE	"You have entered the following numbers:",10,0
 sum_Of_Num_Msg			BYTE	"The sum of these Numbers is: ",0
 trunct_Avg				BYTE	"The truncated average is: ",0
+running_subtotal_disp	BYTE	"Runnning subtotal: ",0
 comma_display			BYTE	", ",0 
 
 store_Num				BYTE	BUFFERSIZE DUP(?)
@@ -135,7 +126,7 @@ MOVE					TEXTEQU <MOV>				; Turns MOV into MOVE to help with text alignment with
 ; Return: None
 ;-----------------------------------------------------------------------------------------------------------
 main PROC
-	;CALL Testing
+	CALL Testing
 
 	; Greets user and displays Instructions
 	mDisplayString OFFSET intro_Display
@@ -151,7 +142,7 @@ main PROC
 	MOVE ECX, ARRAYSIZE
 
 _enter_Num_Loop:
-	MOVE EDX, OFFSET prompt_User_2
+	MOVE EDX, OFFSET running_subtotal_disp
 	PUSH EDX
 	MOVE EAX, num_of_entries
 	PUSH EAX
@@ -174,7 +165,8 @@ _enter_Num_Loop:
 	ADD  EAX, [EDI]
 	MOVE running_Subtotal, EAX
 
-	ADD  ESI, TYPE string_Length_List
+	MOVE EAX, num_of_entries
+	INC  EAX
 	ADD  EDI, TYPE num_List
 
 	LOOP _enter_Num_Loop
@@ -226,7 +218,7 @@ main ENDP
 ;		[EBP + 28] = is_POS_BOOL
 ;		[EBP + 32] = running_subtotal
 ;		[EBP + 36] = num_of_entries
-;		[EBP + 40] = OFFSET prompt_User_2
+;		[EBP + 40] = OFFSET running_subtotal_disp
 ; Return: 36 to derefence any parameters pushed to the stack
 ;-----------------------------------------------------------------------------------------------------------
 ReadVal PROC
@@ -242,11 +234,8 @@ MOVE EBP, ESP
 
 _call_mGetString:
 	MOVE EBX, [EBP + 16]
-	MOVE EDX, [EBP + 20]
-	MOVE ECX, [EBP + 32]
-	MOVE EAX, [EBP + 40]
-
-	mGetString EDX, EBX, ECX, EAX
+	MOVE EAX, [EBP + 20]
+	mGetString EAX, EBX
 	
 	; First step of validation:
 	MOVE EBX, 0					; Checks if list is size zero
@@ -367,6 +356,16 @@ _string_Translated:
 	MOVE EDI, [EBP + 8]
 	MOVE [EDI], EAX	; Stores nums in list	
 
+	; Print running subtotal
+	MOVE EDX, [EBP + 40]
+	mDisplayString EDX
+
+	MOVE EDI, [EBP + 16]
+	PUSH EDI
+	MOVE EAX, [EBP + 32]
+	PUSH EAX
+	CALL WriteVal
+
 	POP ECX
 POP EBP
 RET 36
@@ -470,7 +469,7 @@ _translate_Num:
 	POP  ECX
 	PUSH ECX
 	CMP  ECX, 1				; If length of integer is 1
-	JE _translate_Num_ASCII
+	JBE _translate_Num_ASCII
 
 	PUSH EAX
 	MOVE EAX, 1
@@ -486,8 +485,10 @@ _translate_Num_ASCII:
 	MOVE EAX, EDX
 	POP  ECX
 
+	CMP ECX, 1
+	JBE  _break_Loop
 	CMP ECX, 2
-	JBE _dec_ECX
+	JE  _dec_ECX
 	JNE _keep_Looping
 
 _dec_ECX:
