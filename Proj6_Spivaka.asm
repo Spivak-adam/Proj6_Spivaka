@@ -32,21 +32,29 @@ POSBOUNDSDWORD = 2147483647
 ; Recieves:
 ;		promptUser	- message to prompt user to enter numbers
 ;		storeNum	- parameter by reference to store value
-;		stringLen	- Length of string from EAX
+;		entryNum	- running subtotal of all integers entered
+;		promptUser2 - End of prompt user
 ;-----------------------------------------------------------------------------------------------------------
-mGetstring MACRO promptUser, storeNum, stringLen
-
+mGetstring MACRO promptUser, storeNum, entryNum, promptUser2
 	PUSH EDX
 	PUSH ECX
 
 	MOVE EDX, promptUser
-	MOVE ECX, 14			; A string can only be 12-characters in order to fit into a 32-bit register. 14 is to test if greater than 12 char
 	print_Text
 
+	MOVE EDI, storeNum
+	PUSH EDI
+	MOVE EAX, entryNum
+	PUSH EAX
+	CALL writeVal
+
+	MOVE EDX, promptUser2
+	mDisplayString EDX
+
+	MOVE ECX, 14			; A string can only be 12-characters in order to fit into a 32-bit register. 14 is to test if greater than 12 char
 	MOVE EDX, storeNum
 	CALL ReadString
 	MOVE storeNum, EDX
-	MOVE stringLen, EAX
 
 	POP ECX
 	POP EDX
@@ -93,7 +101,8 @@ intro_Display			BYTE	"Programming assignment 6: Designing low-level I/O procedur
 user_Instructions		BYTE	"Please provide 10 signed decimal integers.",10,
 								"Each number needs to be small enough to fit inside a 32 bit register. After you have finished",10,
 								"inputting the raw numbers I will display a list of the integers, their sum, and their average value",0
-prompt_User				BYTE	"Please enter a signed number: ",0
+prompt_User				BYTE	". Please enter a signed number(",0
+prompt_User_2			BYTE	"): ",0
 error_Message			BYTE	"ERROR: You did not enter a signed number or your number was too big.",0
 you_Have_Entered		BYTE	"You have entered the following numbers:",10,0
 sum_Of_Num_Msg			BYTE	"The sum of these Numbers is: ",0
@@ -107,7 +116,7 @@ string_Length_List		SDWORD	ARRAYSIZE DUP(0)
 string_Length			SDWORD	0
 translated_Num			SDWORD	0
 is_POS_BOOL				DWORD	0					; 0 = Positive Value, 1 = Negative Value
-num_of_entries			DWORD	0
+num_of_entries			DWORD	1
 running_subtotal		SDWORD	0
 
 print_Text				EQU		<CALL WriteString>
@@ -139,12 +148,14 @@ main PROC
 	
 	; Starts taking numbers from User
 	MOVE EDI, OFFSET num_List
-	MOVE ESI, OFFSET string_Length_List
 	MOVE ECX, ARRAYSIZE
 
 _enter_Num_Loop:
-	PUSH ESI						
-	MOVE EAX, string_Length
+	MOVE EDX, OFFSET prompt_User_2
+	PUSH EDX
+	MOVE EAX, num_of_entries
+	PUSH EAX
+	MOVE EAX, running_subtotal
 	PUSH EAX
 	MOVE EAX, is_POS_BOOL
 	PUSH EAX
@@ -213,21 +224,29 @@ main ENDP
 ;		[EBP + 20] = OFFSET prompt_User
 ;		[EBP + 24] = translated_Num
 ;		[EBP + 28] = is_POS_BOOL
-;		[EBP + 32] = string_Length
-;		[EBP + 36] = OFFSET string_Length_List
-; Return: 32 to derefence any parameters pushed to the stack
+;		[EBP + 32] = running_subtotal
+;		[EBP + 36] = num_of_entries
+;		[EBP + 40] = OFFSET prompt_User_2
+; Return: 36 to derefence any parameters pushed to the stack
 ;-----------------------------------------------------------------------------------------------------------
 ReadVal PROC
 PUSH EBP
 MOVE EBP, ESP
 	PUSH ECX
 
+	MOVE EDI, [EBP + 16]
+	PUSH EDI
+	MOVE EAX, [EBP + 36]
+	PUSH EAX
+	CALL WriteVal
+
 _call_mGetString:
 	MOVE EBX, [EBP + 16]
 	MOVE EDX, [EBP + 20]
-	MOVE EAX, [EBP + 32]
-	mGetString EDX, EBX, EAX
-	MOVE [EBP + 32], EAX
+	MOVE ECX, [EBP + 32]
+	MOVE EAX, [EBP + 40]
+
+	mGetString EDX, EBX, ECX, EAX
 	
 	; First step of validation:
 	MOVE EBX, 0					; Checks if list is size zero
@@ -282,10 +301,6 @@ _POS_VALUE:
 	MOVE EAX, 0
 	MOVE [EBP + 28], EAX
 
-	MOVE EAX, [EBP + 32]
-	DEC EAX						; Decrements string length to not account for positive sign
-	MOVE [EBP + 32], EAX
-
 	POP EAX
 	DEC ECX
 	LODSB
@@ -295,10 +310,6 @@ _NEG_VALUE:
 	PUSH EAX
 	MOVE EAX, 1
 	MOVE [EBP + 28], EAX
-
-	MOVE EAX, [EBP + 32]
-	DEC EAX						; Decrements string length to not account for positive sign
-	MOVE [EBP + 32], EAX
 
 	POP EAX
 	DEC ECX
@@ -352,20 +363,13 @@ _string_Translated:
 	CMP  EAX, POSBOUNDSDWORD
 	JG	 _invalid_String
 
-	PUSH EDI
-	MOVE ESI, [EBP + 36]
-	MOVE EDI, ESI
-	MOVE EAX, [EBP + 32]
-	MOVE [EDI], EAX
-	POP EDI
-
 	MOVE EAX, [EBP + 24]
 	MOVE EDI, [EBP + 8]
 	MOVE [EDI], EAX	; Stores nums in list	
 
 	POP ECX
 POP EBP
-RET 32
+RET 36
 ReadVal ENDP
 
 ;-----------------------------------------------------------------------------------------------------------
@@ -406,8 +410,10 @@ _find_integer_Len:
 _found_len:
 	PUSH ECX	; Save ECX for later use
 	CMP  ECX, 10
+	MOVE EAX, [EBP + 8]
+	CLD
 	JAE	 _check_if_NEG
-	JNE  _write_POS_Symbol			; Number is positive
+	JNE  _translate_Num			; Number is positive
 
 _check_if_NEG:
 	; Check if Negative and turn it positive for 2s-compliment
@@ -460,16 +466,12 @@ _write_NEG_Symbol:
 	POP  EAX
 	JMP _translate_Num
 
-_write_POS_Symbol:
-	PUSH EAX
-	MOVE EAX, POS_SIGN
-	STOSB
-	POP EAX
-	JMP _translate_Num
-
 _translate_Num:
 	POP  ECX
 	PUSH ECX
+	CMP  ECX, 1				; If length of integer is 1
+	JE _translate_Num_ASCII
+
 	PUSH EAX
 	MOVE EAX, 1
 	mMultiplyTens EAX, ECX
@@ -478,13 +480,14 @@ _translate_Num:
 	POP  EAX
 	DIV  EBX
 
+_translate_Num_ASCII:
 	ADD AL, ASCIICONSTANT
 	STOSB
 	MOVE EAX, EDX
 	POP  ECX
 
 	CMP ECX, 2
-	JE _dec_ECX
+	JBE _dec_ECX
 	JNE _keep_Looping
 
 _dec_ECX:
