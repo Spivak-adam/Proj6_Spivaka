@@ -126,7 +126,7 @@ MOVE					TEXTEQU <MOV>				; Turns MOV into MOVE to help with text alignment with
 ; Return: None
 ;-----------------------------------------------------------------------------------------------------------
 main PROC
-	CALL Testing
+	;CALL Testing
 
 	; Greets user and displays Instructions
 	mDisplayString OFFSET intro_Display
@@ -139,12 +139,12 @@ main PROC
 	
 	; Starts taking numbers from User
 	MOVE EDI, OFFSET num_List
+	MOVE EAX, num_of_entries
 	MOVE ECX, ARRAYSIZE
 
 _enter_Num_Loop:
 	MOVE EDX, OFFSET running_subtotal_disp
 	PUSH EDX
-	MOVE EAX, num_of_entries
 	PUSH EAX
 	MOVE EAX, running_subtotal
 	PUSH EAX
@@ -160,10 +160,6 @@ _enter_Num_Loop:
 	PUSH EDX
 	PUSH EDI
 	CALL ReadVal
-	
-	MOVE EAX, running_Subtotal
-	ADD  EAX, [EDI]
-	MOVE running_Subtotal, EAX
 
 	MOVE EAX, num_of_entries
 	INC  EAX
@@ -193,6 +189,18 @@ _disp_and_sum:
 	MOVE ESI, OFFSET num_List			; Pushes value stored at ESI from num_List
 	PUSH EDX
 	PUSH [ESI]
+	CALL WriteVal
+	new_Line
+
+	;Display truncated average
+	mDisplayString OFFSET trunct_Avg
+	MOVE EAX, running_Subtotal
+	MOVE EBX, 10
+	DIV  EBX
+
+	MOVE EDX, OFFSET store_Num
+	PUSH EDX
+	PUSH EAX
 	CALL WriteVal
 
 	Invoke ExitProcess,0	; exit to operating system
@@ -357,6 +365,11 @@ _string_Translated:
 	MOVE [EDI], EAX	; Stores nums in list	
 
 	; Print running subtotal
+	MOVE EAX, [EBP + 24]
+	MOVE EBX, [EBP + 32]
+	ADD EAX, EBX
+	MOVE [EBP + 32], EAX
+
 	MOVE EDX, [EBP + 40]
 	mDisplayString EDX
 
@@ -365,6 +378,7 @@ _string_Translated:
 	MOVE EAX, [EBP + 32]
 	PUSH EAX
 	CALL WriteVal
+	new_Line
 
 	POP ECX
 POP EBP
@@ -392,6 +406,7 @@ MOVE EBP, ESP
 PUSH ECX
 	MOVE EDI, [EBP + 12]
 	MOVE EAX, [EBP + 8]		; Number to index through
+	CLD
 
 	; Find length of Integer
 	MOVE ECX, 0
@@ -410,7 +425,6 @@ _found_len:
 	PUSH ECX	; Save ECX for later use
 	CMP  ECX, 10
 	MOVE EAX, [EBP + 8]
-	CLD
 	JAE	 _check_if_NEG
 	JNE  _translate_Num			; Number is positive
 
@@ -518,9 +532,11 @@ WriteVal ENDP
 Testing PROC
 ;TESTING!!!!!!!!
 	MOVE EDI, OFFSET num_List
-	MOVE ESI, OFFSET string_Length_List
-	PUSH ESI						
-	MOVE EAX, string_Length
+	MOVE EDX, OFFSET running_subtotal_disp
+	PUSH EDX
+	MOVE EAX, num_of_entries
+	PUSH EAX
+	MOVE EAX, running_subtotal
 	PUSH EAX
 	MOVE EAX, is_POS_BOOL
 	PUSH EAX
