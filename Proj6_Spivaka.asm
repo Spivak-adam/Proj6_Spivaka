@@ -97,10 +97,11 @@ error_Message			BYTE	"ERROR: You did not enter a signed number or your number wa
 you_Have_Entered		BYTE	"You have entered the following numbers:",10,0
 sum_Of_Num_Msg			BYTE	"The sum of these Numbers is: ",0
 trunct_Avg				BYTE	"The truncated average is: ",0
-running_subtotal_disp	BYTE	"Runnning subtotal: ",0
+running_subtotal_disp	BYTE	"Running Subtotal is: ",0
 comma_display			BYTE	", ",0 
 
 store_Num				BYTE	BUFFERSIZE DUP(?)
+store_Num_2				BYTE	BUFFERSIZE DUP(?)	; Extra empty array to empty first array after each use
 num_List				SDWORD	ARRAYSIZE DUP(0)
 string_Length_List		SDWORD	ARRAYSIZE DUP(0)
 
@@ -143,6 +144,8 @@ main PROC
 	MOVE ECX, ARRAYSIZE
 
 _enter_Num_Loop:
+	MOVE EDX, OFFSET store_Num_2
+	PUSH EDX
 	MOVE EDX, OFFSET running_subtotal_disp
 	PUSH EDX
 	PUSH EAX
@@ -227,12 +230,17 @@ main ENDP
 ;		[EBP + 32] = running_subtotal
 ;		[EBP + 36] = num_of_entries
 ;		[EBP + 40] = OFFSET running_subtotal_disp
-; Return: 36 to derefence any parameters pushed to the stack
+;		[EBP + 44] = OFFSET store_Num_2
+; Return: 40 to derefence any parameters pushed to the stack
 ;-----------------------------------------------------------------------------------------------------------
 ReadVal PROC
 PUSH EBP
 MOVE EBP, ESP
 	PUSH ECX
+
+	MOVE ESI, [EBP + 44]	; Emptys the store_Num array before each
+	MOVE EDI, [EBP + 16]
+	MOVE EDI, [ESI]
 
 	MOVE EDI, [EBP + 16]
 	PUSH EDI
@@ -368,10 +376,13 @@ _string_Translated:
 	MOVE EAX, [EBP + 24]
 	MOVE EBX, [EBP + 32]
 	ADD EAX, EBX
-	MOVE [EBP + 32], EAX
+	MOVE [EBP + 32], EAX	; Running subtotal
 
 	MOVE EDX, [EBP + 40]
 	mDisplayString EDX
+
+	MOVE EDX, [EBP + 44]	; Emptys the store_Num array before each
+	MOVE [EBP + 16], EDX
 
 	MOVE EDI, [EBP + 16]
 	PUSH EDI
@@ -382,7 +393,7 @@ _string_Translated:
 
 	POP ECX
 POP EBP
-RET 36
+RET 40
 ReadVal ENDP
 
 ;-----------------------------------------------------------------------------------------------------------
@@ -391,7 +402,7 @@ ReadVal ENDP
 ; few conditions are needed in order for this PROC to works: The first condition, if the number is negative or positive by checking the sign
 ; flag. If sign flag is set, and the number is negative, it would put a "-" in front. If it's positive it will just move to the next value.
 ; The second coniditon will be to just increment through the signed integer until it reaches the end, translating each number to ASCII values on the way.
-; Preconditions: Any string values that were taken in by the ReadVal procedure have been translated into signed integers. It does this
+; Preconditions: Any string values that were taken in by the ReadVal procedure will either have been translated into signed integers, or a string of text to print. It does this
 ; by iterating through a string of numbers and adding 48 to convert them to their repsecitve ASCII values and saves it byte-by-byte
 ; to build a new string of characters
 ; Postcondition: Prints out a string of values after they are converted from numbers to chars
